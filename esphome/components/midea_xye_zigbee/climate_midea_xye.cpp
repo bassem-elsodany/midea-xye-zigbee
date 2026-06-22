@@ -934,25 +934,20 @@ void ClimateMideaXYE::register_zigbee_thermostat(zigbee::ZigbeeComponent *zb) {
   g_midea_xye_instance = this;
 
   // ── Thermostat cluster (0x0201) ─────────────────────────────────────────
-  // esp_zb_thermostat_cluster_cfg_t is the correct struct (SDK compat header).
-  // Fields: local_temperature, control_sequence_of_operation, system_mode,
-  //         occupied_cooling_setpoint, occupied_heating_setpoint.
-  esp_zb_thermostat_cluster_cfg_t tc = {
-      .local_temperature = (int16_t) 0x8000,      // 0x8000 = "invalid/unknown" per ZCL spec
-      .control_sequence_of_operation = 0x04,       // Cooling + Heating
-      .system_mode = 0x03,                          // Cool (default)
-      .occupied_cooling_setpoint = 2600,            // 26.00 °C
-      .occupied_heating_setpoint = 2000,            // 20.00 °C
-  };
+  // Use field-by-field assignment to avoid C designated-initializer ordering
+  // issues: the SDK's struct field order varies between versions.
+  esp_zb_thermostat_cluster_cfg_t tc{};
+  tc.local_temperature             = static_cast<int16_t>(0x8000);  // invalid/unknown
+  tc.occupied_cooling_setpoint     = 2600;   // 26.00 °C default
+  tc.occupied_heating_setpoint     = 2000;   // 20.00 °C default
+  tc.control_sequence_of_operation = 0x04;   // Cooling + Heating
+  tc.system_mode                   = 0x03;   // Cool
   esp_zb_attribute_list_t *thermo_attrs = esp_zb_thermostat_cluster_create(&tc);
 
   // ── Fan Control cluster (0x0202) ────────────────────────────────────────
-  // esp_zb_fan_control_cluster_cfg_t is a typedef for
-  // ezb_zcl_fan_control_cluster_server_config_t (SDK compat header).
-  esp_zb_fan_control_cluster_cfg_t fc = {
-      .fan_mode = 0x05,           // Auto
-      .fan_mode_sequence = 0x04,  // Off/Low/Med/High/Auto
-  };
+  esp_zb_fan_control_cluster_cfg_t fc{};
+  fc.fan_mode          = 0x05;  // Auto
+  fc.fan_mode_sequence = 0x04;  // Off/Low/Med/High/Auto
   esp_zb_attribute_list_t *fan_attrs = esp_zb_fan_control_cluster_create(&fc);
 
   // ── Cluster list: Basic + Identify (mandatory) + Thermostat + Fan ───────
