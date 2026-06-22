@@ -34,8 +34,8 @@ AC unit → C0 QUERY response → ParseResponse() → publish_state()
                               → Z2M reads updated attributes
 ```
 
-Endpoint **10** is used for the thermostat (outside ESPHome's auto-assigned range
-of 1-N for binary sensors). The endpoint is registered by calling
+Endpoint **100** is used for the thermostat, safely above ESPHome's auto-assigned
+range (which starts at 1 and counts up — 24 diagnostic sensors uses eps 1-24). The endpoint is registered by calling
 `ZigbeeComponent::create_endpoint()` before `App.setup()` so it is included in
 `esp_zb_device_register()` together with ESPHome's own endpoints.
 

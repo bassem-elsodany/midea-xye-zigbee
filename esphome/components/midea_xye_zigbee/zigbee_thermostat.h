@@ -44,7 +44,10 @@ namespace xye {
 //
 // Endpoint 10 sits outside the range ESPHome auto-assigns to binary_sensor
 // entities (1-N, max 8 via CONF_MAX_EP_NUMBER in zigbee_ep_esp32.py).
-static constexpr uint8_t  ZB_THERMO_EP          = 10;
+// Endpoint 100 — chosen to be safely above the range ESPHome auto-assigns
+// to sensor/binary_sensor entities (which start at 1 and count up).
+// With 24 diagnostic sub-sensors, ESPHome would use 1-24 and collide with 10.
+static constexpr uint8_t  ZB_THERMO_EP          = 100;
 static constexpr uint16_t ZB_CL_THERMOSTAT      = 0x0201;
 static constexpr uint16_t ZB_CL_FAN_CONTROL     = 0x0202;
 
