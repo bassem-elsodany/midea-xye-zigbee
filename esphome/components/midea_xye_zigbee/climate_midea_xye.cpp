@@ -934,18 +934,22 @@ void ClimateMideaXYE::register_zigbee_thermostat(zigbee::ZigbeeComponent *zb) {
   g_midea_xye_instance = this;
 
   // ── Thermostat cluster (0x0201) ─────────────────────────────────────────
-  // Use the ESP Zigbee SDK's built-in factory to get all mandatory attributes
-  // (local_temperature, cooling/heating setpoints, control_sequence, system_mode).
-  esp_zb_thermostat_cfg_t tc = {
-      .local_temperature = (int16_t) 0x8000,  // 0x8000 = "invalid" per ZCL spec
-      .occupied_cooling_setpoint = 2600,       // 26.00 °C default
-      .occupied_heating_setpoint = 2000,       // 20.00 °C default
-      .system_mode = 0x03,                     // Cool
+  // esp_zb_thermostat_cluster_cfg_t is the correct struct (SDK compat header).
+  // Fields: local_temperature, control_sequence_of_operation, system_mode,
+  //         occupied_cooling_setpoint, occupied_heating_setpoint.
+  esp_zb_thermostat_cluster_cfg_t tc = {
+      .local_temperature = (int16_t) 0x8000,      // 0x8000 = "invalid/unknown" per ZCL spec
+      .control_sequence_of_operation = 0x04,       // Cooling + Heating
+      .system_mode = 0x03,                          // Cool (default)
+      .occupied_cooling_setpoint = 2600,            // 26.00 °C
+      .occupied_heating_setpoint = 2000,            // 20.00 °C
   };
   esp_zb_attribute_list_t *thermo_attrs = esp_zb_thermostat_cluster_create(&tc);
 
   // ── Fan Control cluster (0x0202) ────────────────────────────────────────
-  esp_zb_fan_control_cfg_t fc = {
+  // esp_zb_fan_control_cluster_cfg_t is a typedef for
+  // ezb_zcl_fan_control_cluster_server_config_t (SDK compat header).
+  esp_zb_fan_control_cluster_cfg_t fc = {
       .fan_mode = 0x05,           // Auto
       .fan_mode_sequence = 0x04,  // Off/Low/Med/High/Auto
   };
@@ -968,7 +972,12 @@ void ClimateMideaXYE::register_zigbee_thermostat(zigbee::ZigbeeComponent *zb) {
   // create_endpoint() calls esp_zb_ep_list_add_ep() on the ep_list that
   // ZigbeeComponent::setup() will later pass to esp_zb_device_register().
   // This call happens before App.setup() so we are guaranteed to be early enough.
-  esp_err_t ret = zb->create_endpoint(ZB_THERMO_EP, ESP_ZB_HA_THERMOSTAT_DEVICE_ID, clusters);
+  // ESP_ZB_HA_THERMOSTAT_DEVICE_ID is esp_zb_ha_standard_devices_t; cast to the
+  // ZBOSS zb_ha_standard_devs_e that ZigbeeComponent::create_endpoint() expects.
+  // Both enums share the same underlying value (0x0301) for HA Thermostat.
+  esp_err_t ret = zb->create_endpoint(ZB_THERMO_EP,
+                                      static_cast<zb_ha_standard_devs_e>(ESP_ZB_HA_THERMOSTAT_DEVICE_ID),
+                                      clusters);
   if (ret != ESP_OK) {
     ESP_LOGE(Constants::TAG, "Failed to create Zigbee thermostat endpoint: %s", esp_err_to_name(ret));
   } else {
