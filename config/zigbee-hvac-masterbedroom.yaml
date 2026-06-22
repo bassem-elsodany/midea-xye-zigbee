@@ -7,7 +7,7 @@
 # • No WiFi, no static IP, no ESPHome API — joins ZHA / Zigbee2MQTT only.
 # • Do NOT enable WiFi on ESP32-C6 alongside Zigbee (shared radio / coexistence).
 # • Flash and firmware updates: USB only (no Zigbee OTA on ESPHome ESP32 yet).
-# • ESPHome Zigbee on ESP32 exposes sensor + binary_sensor — not climate yet.
+# • ESPHome Zigbee on ESP32: full thermostat control via clusters 0x0201 + 0x0202.
 # • Follow-Me via HA Zigbee room sensor is not available without WiFi/API;
 #   uses AC internal T1 unless you add a local I2C sensor on this board.
 # ══════════════════════════════════════════════════════════════════════════════
@@ -106,7 +106,7 @@ logger:
 external_components:
   - source:
       type: git
-      url: https://github.com/bassem-elsodany/hvac-midea-xye
+      url: https://github.com/bassem-elsodany/midea-xye-zigbee
       ref: main
     refresh: always
     components: [midea_xye_zigbee]
