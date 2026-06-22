@@ -23,6 +23,15 @@
 #include "xye_recv.h"
 #ifdef USE_ZIGBEE
 #include "zigbee_thermostat.h"
+// Forward declaration — full definition pulled into climate_midea_xye.cpp via
+// #include "esphome/components/zigbee/zigbee_esp32.h" (inside #ifdef USE_ZIGBEE).
+// Declared here so the class members and method signatures compile without
+// requiring the full header in every translation unit that includes this file.
+namespace esphome {
+namespace zigbee {
+class ZigbeeComponent;
+}  // namespace zigbee
+}  // namespace esphome
 #endif
 
 namespace esphome {
