@@ -1,0 +1,22 @@
+name: "midea_xye_zigbee"
+version: "0.1.0"
+description: "ESP-IDF port of midea_xye for ESP32-C6/H2 (Zigbee-capable targets)"
+components:
+  - id: midea_xye_zigbee
+    files:
+      - climate_midea_xye.h
+      - climate_midea_xye.cpp
+      - climate_automations.h
+      - ir_transmitter.h
+      - static_pressure_interface.h
+      - static_pressure_number.h
+      - zigbee_thermostat.h
+      - xye.h
+      - xye.cpp
+      - xye_adapter.h
+      - xye_adapter.cpp
+      - xye_send.h
+      - xye_send.cpp
+      - xye_recv.h
+      - xye_recv.cpp
+      - xye_log.h

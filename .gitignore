@@ -1,0 +1,15 @@
+# ESPHome build artifacts
+.esphome/
+__pycache__/
+*.pyc
+*.pyo
+
+# secrets (never commit)
+secrets.yaml
+config/secrets.yaml
+
+# editor
+.vscode/
+.idea/
+*.swp
+*.swo

@@ -1,0 +1,326 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# ESPHome config — Midea XYE ducted heat pump via RS-485 (Zigbee-only build)
+# One file per ESP. Copy to HA /config/esphome/, edit the substitutions block
+# at the top, then flash over USB.
+#
+# Zigbee-only notes:
+# • No WiFi, no static IP, no ESPHome API — joins ZHA / Zigbee2MQTT only.
+# • Do NOT enable WiFi on ESP32-C6 alongside Zigbee (shared radio / coexistence).
+# • Flash and firmware updates: USB only (no Zigbee OTA on ESPHome ESP32 yet).
+# • ESPHome Zigbee on ESP32 exposes sensor + binary_sensor — not climate yet.
+# • Follow-Me via HA Zigbee room sensor is not available without WiFi/API;
+#   uses AC internal T1 unless you add a local I2C sensor on this board.
+# ══════════════════════════════════════════════════════════════════════════════
+
+substitutions:
+  # ════════════════════════════════════════
+  # PER-ROOM — change these when copying to a new ESP module
+  # ════════════════════════════════════════
+
+  # ESP mDNS hostname — must be unique per device (no spaces, lowercase-kebab)
+  name: "zigbee-hvac-masterbedroom"
+
+  # Label shown in HA UI for all entities from this device
+  friendly_name: "zigbee masterbedroom HVAC"
+
+  # Free-text comment visible in ESPHome dashboard
+  comment: "ESPHome ESP32-C6 RS-485 — masterbedroom ducted heat pump (Zigbee)"
+
+  # Short slug used in sensor entity IDs
+  room_id: "masterbedroom"
+
+  # Climate entity name shown in HA (keep consistent with `name`)
+  climate_name: "zigbee-hvac-masterbedroom"
+
+  # Climate entity id used internally by ESPHome (underscores, no hyphens)
+  climate_name_id: "zigbee_hvac_masterbedroom"
+
+  # Target temperature slider limits in the HA climate card (visual only —
+  # the AC itself enforces its own hardware min/max)
+  temp_min: "20"   # °C
+  temp_max: "26"   # °C
+
+  # ════════════════════════════════════════
+  # SHARED — same on every ESP (rarely need changing)
+  # ════════════════════════════════════════
+
+  # RS-485 on ESP32-C6 (adjust if your board uses different pins):
+  #   uart_tx → RS-485 DI (Data In)
+  #   uart_rx → RS-485 RO (Receiver Output)
+  # DevKitC-1: GPIO4/GPIO5 — Xiao ESP32-C6: often GPIO21/GPIO20
+  uart_tx: "GPIO4"
+  uart_rx: "GPIO5"
+
+  # XYE bus addressing (single-unit installations: both 0x00)
+  # unit_id   = destination address of the indoor unit (0x00..0x3F or 0xFF broadcast)
+  # master_id = source address this ESP advertises as the CCM/controller (0x00..0x3F)
+  unit_id: "0x00"
+  master_id: "0x00"
+
+  # Component log level — use DEBUG during commissioning, INFO in production
+  midea_xye_log: "DEBUG"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# ESPHome core
+# ──────────────────────────────────────────────────────────────────────────────
+esphome:
+  name: ${name}
+  name_add_mac_suffix: false
+  friendly_name: ${friendly_name}
+  comment: ${comment}
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: esp32c6
+  framework:
+    type: esp-idf
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Zigbee — end device; pairs to ZHA or Zigbee2MQTT coordinator.
+# Re-pair (and re-interview in Z2M) after adding/removing/renaming entities.
+# router: false — end device only; do not use router on C6 with WiFi concerns.
+#
+# model: shown by Z2M in the device list and used to match exposes definitions.
+# After re-flash, re-interview the device in Z2M (Remove device → re-pair) so
+# the new thermostat endpoint (0x0201 + 0x0202) is discovered.
+# ──────────────────────────────────────────────────────────────────────────────
+zigbee:
+  id: zb_hvac
+  router: false
+  power_source: MAINS_SINGLE_PHASE
+  model: midea-xye-hvac
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Logging — no WiFi/API; use USB serial during commissioning if needed.
+# ──────────────────────────────────────────────────────────────────────────────
+logger:
+  level: DEBUG
+  logs:
+    midea_xye: ${midea_xye_log}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Custom midea_xye_zigbee component — ESP-IDF port for ESP32-C6 / H2.
+# refresh: always ensures the git repo is re-fetched on every build so that
+# fixes pushed to main are picked up without changing the ref.
+# ──────────────────────────────────────────────────────────────────────────────
+external_components:
+  - source:
+      type: git
+      url: https://github.com/bassem-elsodany/hvac-midea-xye
+      ref: main
+    refresh: always
+    components: [midea_xye_zigbee]
+
+# ──────────────────────────────────────────────────────────────────────────────
+# UART — RS-485 bus (Midea XYE protocol: 4800 8N1 half-duplex)
+# Auto-direction RS-485 module (e.g. MAX3485 with auto-switch): no flow_control_pin needed.
+# The debug block dumps raw frames to the log — comment out for production.
+# ──────────────────────────────────────────────────────────────────────────────
+uart:
+  tx_pin: ${uart_tx}
+  rx_pin: ${uart_rx}
+  baud_rate: 4800
+  # Raw bus frame hex dump — useful during commissioning; comment out for production:
+  # debug:
+  #   direction: BOTH
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Sensors
+# ──────────────────────────────────────────────────────────────────────────────
+sensor:
+  # Follow-Me via HA Zigbee room sensor is NOT available in this Zigbee-only build
+  # (requires WiFi + platform: homeassistant). To use an external room temp later,
+  # wire a local I2C/BME280 on this ESP and set follow_me_sensor on the climate block.
+
+  # Uptime in seconds (internal — used to compute Uptime Days below)
+  - platform: uptime
+    name: "Uptime"
+    id: uptime_sec
+    internal: true
+
+  # Human-readable uptime in days, updated every minute
+  - platform: template
+    name: "${friendly_name} Uptime Days"
+    lambda: |-
+      return (id(uptime_sec).state/60)/60/24;
+    icon: mdi:clock-start
+    unit_of_measurement: days
+    update_interval: 60s
+    entity_category: DIAGNOSTIC
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Climate entity — Midea XYE heat pump
+# ──────────────────────────────────────────────────────────────────────────────
+climate:
+  - platform: midea_xye_zigbee
+    name: ${climate_name}
+    id: ${climate_name_id}
+
+    # Wire the Zigbee component so the thermostat cluster (0x0201 + Fan 0x0202)
+    # is registered and Zigbee2MQTT can send mode / setpoint / fan commands.
+    zigbee_id: zb_hvac
+
+    # XYE bus addressing (see substitutions above)
+    unit_id: ${unit_id}
+    master_id: ${master_id}
+
+    # How often the ESP polls the AC with a C0 QUERY frame
+    period: 1s
+
+    # How long to wait for the AC to reply before giving up
+    timeout: 100ms
+
+    # Temperature unit sent on the XYE bus — keep false (Celsius) for most units
+    use_fahrenheit: false
+
+    # Emit a beep on the AC when a command is received from HA
+    beeper: true
+
+    # When true: HA climate action (heating/cooling/idle) is derived from the C0 byte-19
+    # compressor-running flag + defrost bit — more accurate than "fan running implies active".
+    compressor_aware_action: true
+
+    # C4 extended query fan sync — this unit returns 0xC5 (C4 not supported), so keep false.
+    # Set true only if your unit responds to C4 QUERY_EXTENDED (0xC4) with valid data.
+    sync_fan_mode_from_device: false
+
+    # C0 fan mode sync — reads physical running speed from C0 byte 9 every poll cycle.
+    # Fixes the "HA shows AUTO, runtime shows MEDIUM" divergence on units without C4 support.
+    # Logic: 0x00 (fan idle) → no update; bit-7 set → AUTO; else → LOW/MEDIUM/HIGH.
+    sync_fan_mode_from_c0: true
+
+    # Temperature slider limits in the HA UI (cosmetic — does not limit what the AC accepts)
+    visual:
+      min_temperature: ${temp_min} °C
+      max_temperature: ${temp_max} °C
+      temperature_step: 1.0 °C
+
+    # AC operating modes exposed in HA
+    # HEAT_COOL = thermostat AUTO: ESP decides HEAT or COOL based on room vs setpoint
+    supported_modes:
+      - FAN_ONLY
+      - HEAT_COOL
+      - COOL
+      - HEAT
+      - DRY
+
+    # follow_me_sensor: not set — Zigbee-only build has no HA API for remote room temp.
+    # Climate current_temperature falls back to C0 T1 (internal_current_temperature below).
+
+    # ── C0 QUERY response trace sensors ────────────────────────────────────────
+    # These expose raw bus fields as HA sensors for diagnostics.
+    # All C0 byte offsets are from PROTOCOL.md "Receive Messages" table.
+
+    # Byte 11 — T1: internal/room air temperature (same as climate current_temperature
+    # when no Follow-Me sensor is available)
+    internal_current_temperature:
+      name: "C0 T1 Room Temp"
+
+    # Byte 10 — target setpoint as reported by the AC (raw Celsius, bit-6 masked)
+    bus_target_temperature:
+      name: "C0 Bus Setpoint"
+
+    # Byte 8 — current operation mode byte (raw hex value)
+    bus_operation_mode:
+      name: "C0 Operation Mode Raw"
+
+    # Byte 8 — current operation mode decoded as text (e.g. "136 (COOL)")
+    bus_operation_mode_text:
+      name: "C0 Operation Mode"
+
+    # Byte 9 — fan mode byte (raw hex; bit-7 = AUTO flag, lower nibble = physical speed)
+    bus_fan_mode:
+      name: "C0 Fan Mode Raw"
+
+    # Byte 9 — fan mode decoded as text (e.g. "130 (AUTO+MED)")
+    bus_fan_mode_text:
+      name: "C0 Fan Mode"
+
+    # Byte 7 — unit capability flags (raw)
+    capabilities:
+      name: "C0 Capabilities Raw"
+
+    # Byte 7 — capabilities decoded as text (e.g. "EXTERNAL_TEMP | SWING")
+    capabilities_text:
+      name: "C0 Capabilities"
+
+    # Byte 20 — special mode flags (ECO, AUX_HEAT, SWING, VENTILATION)
+    mode_flags:
+      name: "C0 Mode Flags"
+
+    # Byte 21 — operation status flags (WATER_PUMP, WATER_LOCK)
+    operation_flags:
+      name: "C0 Operation Flags"
+
+    # Byte 12 — T2A: indoor coil inlet temperature (refrigerant entering evaporator)
+    temperature_2a:
+      name: "C0 T2A Coil Inlet"
+
+    # Byte 13 — T2B: indoor coil outlet temperature (refrigerant leaving evaporator)
+    temperature_2b:
+      name: "C0 T2B Coil Outlet"
+
+    # Byte 14 — T3: outdoor coil / ambient temperature
+    temperature_3:
+      name: "C0 T3 Outdoor Coil"
+
+    # Bytes 17-18 — timer start/stop settings (raw flag bitmask)
+    timer_start:
+      name: "C0 Timer Start"
+    timer_stop:
+      name: "C0 Timer Stop"
+
+    # Bytes 22-23 — E1/E2 error code flags (16-bit; non-zero means a fault code)
+    error_flags:
+      name: "C0 Error Flags"
+
+    # Bytes 24-25 — protection flags (bit 0x0002 = defrost cycle active)
+    protect_flags:
+      name: "C0 Protect Flags"
+
+    # Byte 26 — CCM communication error flags (timeout, CRC error, protocol error)
+    ccm_error_flags:
+      name: "C0 CCM Error Flags"
+
+    # Byte 9 lower nibble — physical fan speed ordinal (0=off, 1=high, 2=med, 4=low)
+    fan_speed:
+      name: "C0 Fan Speed Level"
+
+    # Byte 6 — unknown field (possibly capabilities-related; 0x30 observed)
+    unknown1:
+      name: "C0 Unknown1"
+
+    # Byte 16 — unknown field
+    unknown2:
+      name: "C0 Unknown2"
+
+    # Byte 27 — hardware-dependent steady value (0x00 or 0x14 observed across units)
+    unknown4:
+      name: "C0 Unknown4"
+
+    # Byte 28 — drifts slowly; leading hypothesis: IDU EEV step count low byte
+    unknown5:
+      name: "C0 Unknown5"
+
+    # Byte 29 — steady per unit; leading hypothesis: IDU EEV step count high byte
+    unknown6:
+      name: "C0 Unknown6"
+
+    # Byte 19 bit + protect_flags bit 0x0002 — defrost cycle binary sensor
+    defrost:
+      name: "C0 Defrost Active"
+
+    # Byte 19 — provisional compressor-running flag (0x01 running, 0x00 idle)
+    compressor_active:
+      name: "C0 Compressor Run Flag"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Internal switch — tracks RS-485 bus state (used internally by component)
+# ──────────────────────────────────────────────────────────────────────────────
+switch:
+  - platform: template
+    name: "RS485 Active"
+    id: rs485_active
+    optimistic: true
+    internal: true
+    restore_mode: ALWAYS_ON

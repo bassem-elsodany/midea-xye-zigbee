@@ -1,0 +1,65 @@
+#pragma once
+
+
+#include "esphome/core/automation.h"
+#include "climate_midea_xye.h"
+
+namespace esphome {
+namespace midea {
+namespace xye {
+
+template<typename... Ts> class MideaActionBase : public Action<Ts...> {
+ public:
+  void set_parent(ClimateMideaXYE *parent) { this->parent_ = parent; }
+
+ protected:
+  ClimateMideaXYE *parent_;
+};
+
+template<typename... Ts> class FollowMeAction : public MideaActionBase<Ts...> {
+  TEMPLATABLE_VALUE(float, temperature)
+  TEMPLATABLE_VALUE(bool, beeper)
+
+  void play(const Ts &...x) override {
+    this->parent_->do_follow_me(this->temperature_.value(x...), this->beeper_.value(x...));
+  }
+};
+
+template<typename... Ts> class SwingStepAction : public MideaActionBase<Ts...> {
+ public:
+  void play(const Ts &...x) override { this->parent_->do_swing_step(); }
+};
+
+template<typename... Ts> class DisplayToggleAction : public MideaActionBase<Ts...> {
+ public:
+  void play(const Ts &...x) override { this->parent_->do_display_toggle(); }
+};
+
+template<typename... Ts> class BeeperOnAction : public MideaActionBase<Ts...> {
+ public:
+  void play(const Ts &...x) override { this->parent_->do_beeper_on(); }
+};
+
+template<typename... Ts> class BeeperOffAction : public MideaActionBase<Ts...> {
+ public:
+  void play(const Ts &...x) override { this->parent_->do_beeper_off(); }
+};
+
+template<typename... Ts> class PowerOnAction : public MideaActionBase<Ts...> {
+ public:
+  void play(const Ts &...x) override { this->parent_->do_power_on(); }
+};
+
+template<typename... Ts> class PowerOffAction : public MideaActionBase<Ts...> {
+ public:
+  void play(const Ts &...x) override { this->parent_->do_power_off(); }
+};
+
+template<typename... Ts> class PowerToggleAction : public MideaActionBase<Ts...> {
+ public:
+  void play(const Ts &...x) override { this->parent_->do_power_toggle(); }
+};
+
+}  // namespace xye
+}  // namespace midea
+}  // namespace esphome
